@@ -1591,3 +1591,28 @@ void llvm::expandAtomicMemCpyAsLoop(AnyMemCpyInst *AtomicMemcpy,
         /*AtomicElementSize=*/AtomicMemcpy->getElementSizeInBytes());
   }
 }
+void llvm::emitBoundedMaskedMemcpy(MemTransferInst *MemCpy, unsigned VF) {
+  IRBuilder<> Builder(MemCpy);
+  Value *Dst = MemCpy->getRawDest();
+  Value *Src = MemCpy->getRawSource();
+  Value *Size = MemCpy->getLength();
+
+  Type *MaskIntTy = Builder.getIntNTy(VF);
+
+  Type *WideTy = Builder.getInt128Ty();
+  Value *SizeWide = Builder.CreateZExtOrTrunc(Size, WideTy);
+  Value *One = ConstantInt::get(WideTy, 1);
+  Value *Shifted = Builder.CreateShl(One, SizeWide);
+  Value *MinusOne = Builder.CreateSub(Shifted, ConstantInt::get(WideTy, 1));
+  Value *MaskBits = Builder.CreateTrunc(MinusOne, MaskIntTy);
+
+  Type *MaskVecTy = FixedVectorType::get(Builder.getInt1Ty(), VF);
+  Value *Mask = Builder.CreateBitCast(MaskBits, MaskVecTy);
+
+  Type *DataVecTy = FixedVectorType::get(Builder.getInt8Ty(), VF);
+  Align DstAlign = MemCpy->getDestAlign().valueOrOne();
+  Align SrcAlign = MemCpy->getSourceAlign().valueOrOne();
+  Value *Loaded = Builder.CreateMaskedLoad(DataVecTy, Src, SrcAlign, Mask,
+                                           nullptr, "masked.copy");
+  Builder.CreateMaskedStore(Loaded, Dst, DstAlign, Mask);
+}

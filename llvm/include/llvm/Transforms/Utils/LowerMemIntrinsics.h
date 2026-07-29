@@ -27,6 +27,7 @@ class MemCpyInst;
 class MemMoveInst;
 class MemSetInst;
 class MemSetPatternInst;
+class MemTransferInst;
 class ScalarEvolution;
 class TargetTransformInfo;
 class Value;
@@ -55,6 +56,7 @@ LLVM_ABI void expandMemCpyAsLoop(MemCpyInst *MemCpy,
                                  const TargetTransformInfo &TTI,
                                  ScalarEvolution *SE = nullptr);
 
+LLVM_ABI void emitBoundedMaskedMemcpy(MemTransferInst *MemCpy, unsigned VF);
 /// Expand \p MemMove as a loop. \p MemMove is not deleted. Returns true if the
 /// memmove was lowered.
 LLVM_ABI bool expandMemMoveAsLoop(MemMoveInst *MemMove,
